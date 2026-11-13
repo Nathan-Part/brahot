@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Brahot</title>
+  <meta name="description" content="Compteur de brahot quotidien">
+  <meta name="theme-color" content="#fcfaf6">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="default">
+  <meta name="apple-mobile-web-app-title" content="Brahot">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon-192.png" type="image/png">
+  <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <h1 class="brand">Brahot</h1>
+      <p class="subtitle" id="day-label"></p>
+    </div>
+    <p class="hebdate" id="heb-date" dir="rtl" lang="he"></p>
+  </header>
+
+  <main>
+    <!-- AUJOURD'HUI -->
+    <section class="view" id="view-today" data-view="today">
+      <div class="hero">
+        <svg class="ring" viewBox="0 0 120 120" aria-hidden="true">
+          <circle class="ring-track" cx="60" cy="60" r="52"></circle>
+          <circle class="ring-fill" id="ring-fill" cx="60" cy="60" r="52"></circle>
+        </svg>
+        <div class="hero-center">
+          <div class="count" id="count">0</div>
+          <div class="goal" id="goal-label">/ 100</div>
+        </div>
+      </div>
+      <p class="goal-msg" id="goal-msg"></p>
+
+      <form class="add-form" id="add-form" autocomplete="off">
+        <input id="add-label" type="text" list="label-suggestions" placeholder="Libellé de la braha…" enterkeyhint="done" aria-label="Libellé de la braha">
+        <datalist id="label-suggestions"></datalist>
+        <button type="submit" class="btn btn-primary btn-plus">+1</button>
+      </form>
+
+      <h2 class="section-title">Raccourcis</h2>
+      <div class="presets" id="presets"></div>
+
+      <div class="row-between">
+        <h2 class="section-title">Aujourd'hui</h2>
+        <span class="muted small" id="entries-count"></span>
+      </div>
+      <ul class="entries" id="entries"></ul>
+
+      <button class="btn btn-next" id="next-day">Jour suivant →</button>
+    </section>
+
+    <!-- HISTORIQUE -->
+    <section class="view" id="view-history" data-view="history" hidden>
+      <div class="stats" id="stats"></div>
+      <div id="history"></div>
+    </section>
+
+    <!-- REGLAGES -->
+    <section class="view" id="view-settings" data-view="settings" hidden>
+      <h2 class="section-title">Objectif quotidien</h2>
+      <div class="card">
+        <label class="field">
+          <span>Nombre de brahot visé</span>
+          <input id="goal-input" type="number" inputmode="numeric" min="1" max="1000">
+        </label>
+      </div>
+
+      <h2 class="section-title">Tombée de la nuit</h2>
+      <div class="card stack">
+        <label class="field">
+          <span>Nouveau jour automatique à tzeit hakokhavim</span>
+          <input type="checkbox" id="auto-next" class="switch">
+        </label>
+        <label class="field">
+          <span>Lieu</span>
+          <select id="city-select"></select>
+        </label>
+        <button class="btn btn-ghost" id="use-gps">Utiliser ma position GPS</button>
+        <label class="field">
+          <span>Calcul</span>
+          <select id="tzeit-deg">
+            <option value="8.5">Soleil à 8,5° (standard)</option>
+            <option value="7.083">Soleil à 7,08° (3 étoiles moyennes)</option>
+          </select>
+        </label>
+        <p class="muted small" id="zmanim-info"></p>
+      </div>
+
+      <h2 class="section-title">Raccourcis</h2>
+      <div class="card">
+        <ul class="preset-editor" id="preset-editor"></ul>
+        <button class="btn btn-ghost" id="add-preset">+ Ajouter un raccourci</button>
+      </div>
+
+      <h2 class="section-title">Sauvegarde</h2>
+      <div class="card stack">
+        <p class="muted small">Les données sont stockées uniquement sur ce téléphone. Exporte une sauvegarde de temps en temps.</p>
+        <button class="btn btn-ghost" id="export">Exporter (fichier JSON)</button>
+        <label class="btn btn-ghost file-btn">
+          Importer une sauvegarde
+          <input type="file" id="import" accept="application/json,.json" hidden>
+        </label>
+        <button class="btn btn-danger" id="reset-all">Tout effacer</button>
+      </div>
+    </section>
+  </main>
+
+  <nav class="tabbar">
+    <button class="tab active" data-tab="today">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 8v8M8 12h8"/></svg>
+      <span>Aujourd'hui</span>
+    </button>
+    <button class="tab" data-tab="history">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+      <span>Historique</span>
+    </button>
+    <button class="tab" data-tab="settings">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3M5.3 5.3l2.1 2.1M16.6 16.6l2.1 2.1M5.3 18.7l2.1-2.1M16.6 7.4l2.1-2.1"/></svg>
+      <span>Réglages</span>
+    </button>
+  </nav>
+
+  <div class="toast" id="toast" hidden>
+    <span id="toast-text"></span>
+    <button id="toast-undo" class="toast-undo">Annuler</button>
+  </div>
+
+  <dialog id="confirm" class="modal">
+    <form method="dialog">
+      <h3 id="confirm-title"></h3>
+      <p id="confirm-text" class="muted"></p>
+      <div class="modal-actions">
+        <button value="cancel" class="btn btn-ghost">Annuler</button>
+        <button value="ok" class="btn btn-primary" id="confirm-ok">OK</button>
+      </div>
+    </form>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>
