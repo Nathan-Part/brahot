@@ -2,6 +2,14 @@
 
 const STORAGE_KEY = 'brahot:v1';
 
+// Écran « Installe l'app » ou affichage dans un cadre : l'app ne démarre pas (voir gate.js).
+const BLOCKED = ['needs-install', 'framed'].some((c) => document.documentElement.classList.contains(c));
+
+// Limites appliquées aux données chargées ou importées (un fichier piégé ne doit pas
+// pouvoir bloquer l'app ni saturer le stockage du téléphone).
+const LIMITS = { presets: 100, entriesPerDay: 2000, historyDays: 10000, label: 80, importBytes: 5 * 1024 * 1024 };
+const MIN_TS = Date.UTC(2000, 0, 1);
+
 const DEFAULT_PRESETS = [
   { label: 'Birkat Hamazone', count: 4 },
   { label: 'Amida', count: 19 },
@@ -29,6 +37,13 @@ const fmtTime = (ts) => new Date(ts).toLocaleTimeString('fr-FR', { hour: '2-digi
 const fmtDay = (ts) => {
   const s = new Date(ts).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
   return s.charAt(0).toUpperCase() + s.slice(1);
+};
+// Identifiants : uniquement ceux générés par uid() (alphanumériques), sinon on en recrée un.
+const cleanId = (v) => (typeof v === 'string' && /^[a-z0-9]{1,32}$/i.test(v) ? v : uid());
+// Horodatage plausible (pas avant 2000, pas plus de 2 jours dans le futur), sinon valeur de repli.
+const cleanTs = (v, fallback) => {
+  const n = Number(v);
+  return Number.isFinite(n) && n >= MIN_TS && n <= Date.now() + 2 * 86400000 ? n : fallback;
 };
 const vibrate = (ms = 12) => { try { navigator.vibrate && navigator.vibrate(ms); } catch (_) {} };
 
@@ -174,7 +189,9 @@ function sanitizeLocation(loc) {
     const lat = Number(loc.lat);
     const lon = Number(loc.lon);
     if (Math.abs(lat) <= 90 && Math.abs(lon) <= 180) {
-      return { id: String(loc.id || 'custom').slice(0, 30), label: String(loc.label || 'Lieu').slice(0, 60), lat, lon };
+      const id = typeof loc.id === 'string' && /^[a-z0-9-]{1,30}$/i.test(loc.id) ? loc.id : 'custom';
+      const label = typeof loc.label === 'string' && loc.label.trim() ? loc.label.trim().slice(0, 60) : 'Lieu';
+      return { id, label, lat, lon };
     }
   }
   return { ...CITIES[0] };
@@ -184,11 +201,12 @@ function sanitizeEntries(list) {
   if (!Array.isArray(list)) return [];
   return list
     .filter((e) => e && typeof e.label === 'string')
+    .slice(0, LIMITS.entriesPerDay)
     .map((e) => ({
-      id: e.id || uid(),
-      label: e.label.slice(0, 80),
+      id: cleanId(e.id),
+      label: e.label.slice(0, LIMITS.label),
       count: clampInt(e.count, 1, 999, 1),
-      ts: Number(e.ts) || Date.now(),
+      ts: cleanTs(e.ts, Date.now()),
     }));
 }
 
@@ -201,22 +219,27 @@ function sanitizeState(raw) {
     presets: Array.isArray(raw.presets)
       ? raw.presets
           .filter((p) => p && typeof p.label === 'string')
-          .map((p) => ({ id: p.id || uid(), label: p.label.slice(0, 80), count: clampInt(p.count, 1, 999, 1) }))
+          .slice(0, LIMITS.presets)
+          .map((p) => ({ id: cleanId(p.id), label: p.label.slice(0, LIMITS.label), count: clampInt(p.count, 1, 999, 1) }))
       : base.presets,
     current: {
-      startedAt: Number(raw.current && raw.current.startedAt) || Date.now(),
+      startedAt: cleanTs(raw.current && raw.current.startedAt, Date.now()),
       entries: sanitizeEntries(raw.current && raw.current.entries),
     },
     history: Array.isArray(raw.history)
       ? raw.history
           .filter((d) => d && Array.isArray(d.entries))
-          .map((d) => ({
-            id: d.id || uid(),
-            startedAt: Number(d.startedAt) || Date.now(),
-            endedAt: Number(d.endedAt) || Number(d.startedAt) || Date.now(),
-            goal: clampInt(d.goal, 1, 1000, base.goal),
-            entries: sanitizeEntries(d.entries),
-          }))
+          .slice(0, LIMITS.historyDays)
+          .map((d) => {
+            const startedAt = cleanTs(d.startedAt, Date.now());
+            return {
+              id: cleanId(d.id),
+              startedAt,
+              endedAt: cleanTs(d.endedAt, startedAt),
+              goal: clampInt(d.goal, 1, 1000, base.goal),
+              entries: sanitizeEntries(d.entries),
+            };
+          })
       : [],
     autoNextDay: raw.autoNextDay !== false,
     location: sanitizeLocation(raw.location),
@@ -294,7 +317,7 @@ function confirmDialog({ title, text, ok = 'OK', danger = false }) {
 
 function addEntry(label, count) {
   checkNightfall();
-  const entry = { id: uid(), label: label.trim() || 'Braha', count, ts: Date.now() };
+  const entry = { id: uid(), label: label.trim().slice(0, LIMITS.label) || 'Braha', count, ts: Date.now() };
   const before = sum(state.current.entries);
   state.current.entries.push(entry);
   save();
@@ -414,7 +437,7 @@ function renderToday(bump = false) {
           </button>`
         )
         .join('')
-    : '<p class="empty" style="grid-column:1/-1">Aucun raccourci. Ajoute-en dans les Réglages.</p>';
+    : '<p class="empty">Aucun raccourci. Ajoute-en dans les Réglages.</p>';
 
   // Liste du jour (plus récent en haut)
   const entries = [...state.current.entries].reverse();
@@ -482,10 +505,14 @@ function renderHistory() {
           <ul>${rows}</ul>
           <button class="link-danger" data-delete-day="${esc(d.id)}">Supprimer ce jour</button>
         </div>
-        <div class="day-bar"><div style="width:${pct}%"></div></div>
+        <div class="day-bar"><div data-pct="${pct}"></div></div>
       </details>`;
     })
     .join('');
+  // Largeur des barres posée via le DOM : la CSP interdit les attributs style="" dans le HTML.
+  document.querySelectorAll('#history .day-bar > div').forEach((el) => {
+    el.style.width = `${clampInt(el.dataset.pct, 0, 100, 0)}%`;
+  });
 }
 
 /* ---------- Render: settings ---------- */
@@ -495,7 +522,7 @@ function renderSettings() {
   $('#preset-editor').innerHTML = state.presets
     .map(
       (p, i) => `<li class="pe-row" data-id="${esc(p.id)}">
-        <input class="pe-label" type="text" value="${esc(p.label)}" placeholder="Libellé" data-field="label" aria-label="Libellé">
+        <input class="pe-label" type="text" maxlength="80" value="${esc(p.label)}" placeholder="Libellé" data-field="label" aria-label="Libellé">
         <input class="pe-count" type="number" inputmode="numeric" min="1" max="999" value="${p.count}" data-field="count" aria-label="Nombre">
         <button class="icon-btn" data-move="-1" ${i === 0 ? 'disabled' : ''} aria-label="Monter">↑</button>
         <button class="icon-btn" data-move="1" ${i === state.presets.length - 1 ? 'disabled' : ''} aria-label="Descendre">↓</button>
@@ -615,7 +642,7 @@ $('#preset-editor').addEventListener('change', (ev) => {
   const preset = state.presets.find((p) => p.id === row.dataset.id);
   if (!preset) return;
   if (ev.target.dataset.field === 'label') {
-    preset.label = ev.target.value.trim().slice(0, 80) || preset.label;
+    preset.label = ev.target.value.trim().slice(0, LIMITS.label) || preset.label;
     ev.target.value = preset.label;
   } else if (ev.target.dataset.field === 'count') {
     preset.count = clampInt(ev.target.value, 1, 999, preset.count);
@@ -653,6 +680,10 @@ $('#preset-editor').addEventListener('click', (ev) => {
 });
 
 $('#add-preset').addEventListener('click', () => {
+  if (state.presets.length >= LIMITS.presets) {
+    showToast(`Maximum ${LIMITS.presets} raccourcis`);
+    return;
+  }
   state.presets.push({ id: uid(), label: 'Nouvelle braha', count: 1 });
   save();
   renderSettings();
@@ -690,6 +721,10 @@ $('#import').addEventListener('change', async (ev) => {
   const file = ev.target.files && ev.target.files[0];
   ev.target.value = '';
   if (!file) return;
+  if (file.size > LIMITS.importBytes) {
+    showToast('Fichier trop volumineux pour une sauvegarde Brahot');
+    return;
+  }
   let data;
   try {
     data = JSON.parse(await file.text());
@@ -770,26 +805,28 @@ $('#use-gps').addEventListener('click', () => {
   );
 });
 
-// Vérifie la tombée de la nuit régulièrement et au retour sur l'app
-setInterval(checkNightfall, 30000);
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible' && !checkNightfall()) renderToday();
-});
-
-// Synchronise si l'app est ouverte dans plusieurs onglets
-window.addEventListener('storage', (ev) => {
-  if (ev.key === STORAGE_KEY) {
-    state = loadState();
-    renderAll();
-  }
-});
-
 /* ---------- Init ---------- */
 
-if (!checkNightfall()) renderAll();
+if (!BLOCKED) {
+  // Vérifie la tombée de la nuit régulièrement et au retour sur l'app
+  setInterval(checkNightfall, 30000);
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible' && !checkNightfall()) renderToday();
+  });
 
-if (navigator.storage && navigator.storage.persist) {
-  navigator.storage.persist().catch(() => {});
+  // Synchronise si l'app est ouverte dans plusieurs onglets
+  window.addEventListener('storage', (ev) => {
+    if (ev.key === STORAGE_KEY) {
+      state = loadState();
+      renderAll();
+    }
+  });
+
+  if (!checkNightfall()) renderAll();
+
+  if (navigator.storage && navigator.storage.persist) {
+    navigator.storage.persist().catch(() => {});
+  }
 }
 
 if ('serviceWorker' in navigator) {

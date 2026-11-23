@@ -1,15 +1,17 @@
 // Service worker : l'app marche hors-ligne et se met à jour toute seule.
 // Stratégie "stale-while-revalidate" : on sert le cache tout de suite,
 // puis on récupère la nouvelle version en arrière-plan pour le prochain lancement.
-const CACHE = 'brahot-v1';
+const CACHE = 'brahot-v2';
 const ASSETS = [
   './',
   'index.html',
   'styles.css',
+  'gate.js',
   'app.js',
   'manifest.webmanifest',
   'icons/icon-192.png',
   'icons/icon-512.png',
+  'icons/maskable-512.png',
   'icons/apple-touch-icon.png',
 ];
 
@@ -27,13 +29,18 @@ self.addEventListener('activate', (event) => {
 
 self.addEventListener('fetch', (event) => {
   const req = event.request;
-  if (req.method !== 'GET' || new URL(req.url).origin !== self.location.origin) return;
+  // Seulement les fichiers de l'app elle-même : sur GitHub Pages, le même domaine
+  // héberge d'autres projets, qui n'ont rien à faire dans ce cache.
+  if (req.method !== 'GET' || !req.url.startsWith(self.registration.scope)) return;
+  const url = new URL(req.url);
+  // Clé sans paramètres (?test…) : une seule copie par fichier, le cache ne grossit pas.
+  const key = url.origin + url.pathname;
   event.respondWith(
     caches.open(CACHE).then(async (cache) => {
-      const cached = await cache.match(req, { ignoreSearch: true });
+      const cached = await cache.match(key);
       const network = fetch(req)
         .then((res) => {
-          if (res && res.ok) cache.put(req, res.clone());
+          if (res && res.ok && res.type === 'basic' && !res.redirected) cache.put(key, res.clone());
           return res;
         })
         .catch(() => null);

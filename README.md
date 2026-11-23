@@ -38,6 +38,7 @@ Count each braha in one tap, see your progress towards the daily goal, and let t
 - **History** with daily average, best day, goals reached, and a breakdown by braha for each day.
 - **Backup and restore** to a JSON file, so you can move to a new phone.
 - **Works offline** and installs to the home screen like a native app.
+- **App-only on phones**: on a phone the site asks you to install the app first, with step-by-step instructions (and a one-tap **Install** button on Android). On iPhone, the installed app and Safari keep separate data, so this prevents counting brahot in Safari and losing them later. If data was already saved in Safari, an **Export** button lets you move it into the installed app. Add `?test` to the URL to skip this screen during development.
 
 > The interface is in French.
 
@@ -46,6 +47,14 @@ Count each braha in one tap, see your progress towards the daily goal, and let t
 Brahot is **local-first**. All data lives in the browser's `localStorage` on your phone. The app makes no network requests at all: no server, no account, no tracking and no analytics. If you use the GPS option, the position is rounded to about 100 m and only stored on the device to compute nightfall. The app also asks the browser for persistent storage so your data is not evicted.
 
 Because nothing is synced, export a backup from time to time (**Réglages → Sauvegarde → Exporter**).
+
+### Security
+
+- **Content Security Policy**: only the app's own scripts, styles and images can load. No inline script or inline style is allowed, so injected markup cannot run code.
+- **Escaped rendering**: every user-provided label is HTML-escaped before it reaches the page.
+- **Strict validation** of stored data and imported backups: identifiers, timestamps, numbers and string lengths are checked, list sizes are capped and backup files over 5 MB are refused, so a crafted file cannot break the app or fill the phone's storage.
+- **No framing**: the app refuses to run inside an iframe on another site.
+- **Scoped service worker**: it only caches the app's own files, not other sites hosted on the same domain.
 
 ## Tech stack
 
@@ -66,7 +75,7 @@ Because nothing is synced, export a backup from time to time (**Réglages → Sa
 - **Gematria**: numbers are written in Hebrew letters with geresh and gershayim, including the special forms ט״ו and ט״ז for 15 and 16.
 - **Safe imports**: backup files are sanitized field by field (types, ranges, string lengths) before they replace the current data.
 - **Multi-tab sync**: if the app is open in several tabs, they stay in sync through the `storage` event.
-- **Tiny footprint**: about 47 kB of source in total, with zero dependencies.
+- **Tiny footprint**: about 58 kB of source in total, with zero dependencies.
 
 ## Getting started
 
@@ -88,7 +97,7 @@ The app is a fully static site, so it can be hosted for free anywhere.
 
 **GitHub Pages**: in the repository settings, go to **Pages → Build and deployment**, set **Source** to **Deploy from a branch**, pick `main` and `/ (root)`, then save. The site is online after about a minute.
 
-**Updates**: installed apps update themselves. The new version is downloaded in the background and shown on the next launch. To force every file to be downloaded again, bump `CACHE` in `sw.js` (for example `brahot-v2`).
+**Updates**: installed apps update themselves. The new version is downloaded in the background and shown on the next launch. To force every file to be downloaded again, bump `CACHE` in `sw.js` (for example `brahot-v3`).
 
 ## Install on your phone
 
@@ -100,7 +109,8 @@ Open the [live site](https://nathan-part.github.io/brahot/), then:
 ## Project structure
 
 ```
-├── index.html             # App shell: Today, History and Settings views
+├── index.html             # App shell: Today, History and Settings views, install screen
+├── gate.js                # Runs first: install screen on phones, anti-framing
 ├── app.js                 # State, rendering, zmanim, Hebrew date, backup
 ├── styles.css             # Design tokens and components
 ├── sw.js                  # Service worker (offline cache, auto-update)

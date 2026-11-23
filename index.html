@@ -3,6 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; manifest-src 'self'; connect-src 'self'; worker-src 'self'; base-uri 'none'; form-action 'self'; object-src 'none'">
+  <meta name="referrer" content="no-referrer">
   <title>Brahot</title>
   <meta name="description" content="Compteur de brahot quotidien">
   <meta name="theme-color" content="#fcfaf6">
@@ -14,8 +16,37 @@
   <link rel="icon" href="icons/icon-192.png" type="image/png">
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
   <link rel="stylesheet" href="styles.css">
+  <script src="gate.js"></script>
 </head>
 <body>
+  <!-- Sur téléphone, hors de l'app installée : on demande d'installer l'app (voir gate.js) -->
+  <div class="install-gate" id="install-gate">
+    <img src="icons/icon-192.png" alt="" class="ig-icon" width="80" height="80">
+    <h1 class="ig-title">Installe l'app</h1>
+    <p class="ig-lead ig-ios">Sur iPhone, tes brahot sont enregistrées dans l'app installée sur ton écran d'accueil, pas dans Safari. Installe-la d'abord, puis ouvre-la depuis son icône.</p>
+    <p class="ig-lead ig-android">Brahot s'utilise depuis l'app installée sur ton écran d'accueil : elle s'ouvre en plein écran et marche même sans réseau.</p>
+
+    <button class="btn btn-primary ig-install" id="ig-install" hidden>Installer Brahot</button>
+    <p class="ig-installed" id="ig-installed" hidden>C'est installé ! Ouvre <strong>Brahot</strong> depuis l'icône sur ton écran d'accueil.</p>
+
+    <ol class="ig-steps ig-ios">
+      <li><span class="ig-num">1</span><span>Touche le bouton <strong>Partager</strong> (le carré avec une flèche) dans la barre du navigateur.</span></li>
+      <li><span class="ig-num">2</span><span>Choisis <strong>« Sur l'écran d'accueil »</strong>, puis <strong>Ajouter</strong>.</span></li>
+      <li><span class="ig-num">3</span><span>Ferme le navigateur et ouvre <strong>Brahot</strong> depuis l'icône.</span></li>
+    </ol>
+    <ol class="ig-steps ig-android">
+      <li><span class="ig-num">1</span><span>Touche le menu <strong>⋮</strong> en haut à droite du navigateur.</span></li>
+      <li><span class="ig-num">2</span><span>Choisis <strong>« Installer l'application »</strong> ou <strong>« Ajouter à l'écran d'accueil »</strong>.</span></li>
+      <li><span class="ig-num">3</span><span>Ouvre <strong>Brahot</strong> depuis l'icône sur ton écran d'accueil.</span></li>
+    </ol>
+    <p class="muted small ig-note">L'option n'apparaît pas ? Ouvre cette page dans <span class="ig-ios">Safari</span><span class="ig-android">Chrome</span>. Si l'app est déjà installée, ouvre-la depuis son icône.</p>
+
+    <div class="card stack ig-legacy" id="ig-legacy" hidden>
+      <p class="small"><strong>Tu as déjà compté des brahot dans ce navigateur.</strong> Exporte-les, puis dans l'app installée va dans <strong>Réglages → Sauvegarde → Importer</strong>.</p>
+      <button class="btn btn-ghost" id="ig-export">Exporter mes données</button>
+    </div>
+  </div>
+
   <header class="topbar">
     <div>
       <h1 class="brand">Brahot</h1>
@@ -40,7 +71,7 @@
       <p class="goal-msg" id="goal-msg"></p>
 
       <form class="add-form" id="add-form" autocomplete="off">
-        <input id="add-label" type="text" list="label-suggestions" placeholder="Libellé de la braha…" enterkeyhint="done" aria-label="Libellé de la braha">
+        <input id="add-label" type="text" maxlength="80" list="label-suggestions" placeholder="Libellé de la braha…" enterkeyhint="done" aria-label="Libellé de la braha">
         <datalist id="label-suggestions"></datalist>
         <button type="submit" class="btn btn-primary btn-plus">+1</button>
       </form>
