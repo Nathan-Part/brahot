@@ -1,0 +1,20 @@
+# Personal data exported from the app
+brahot-sauvegarde-*.json
+
+# Environment variables
+.env
+.env.*
+
+# Logs
+*.log
+
+# Editor and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Claude Code
+.claude/
+CLAUDE.md
